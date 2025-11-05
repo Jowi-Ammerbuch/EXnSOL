@@ -1,0 +1,1017 @@
+%% EXnSOL.sty
+%% Version 0.6 vom 29.06.25
+%%% Changelog:
+% - \solution bzw. \SOL künftig ohne optionales Argument Farbe, solcolor muss separat geändert wertden
+% \definecolor{solcolor}{rgb}{1,0,0}
+% - Aus \inSOL wird \SOL* (Stringentere Namensgebung), aus \solution wird \SOL
+%% Copyright 2024 J. Wirth
+%
+% This work may be distributed and/or modified under the
+% conditions of the LaTeX Project Public License, either version 1.3
+% of this license or (at your option) any later version.
+% The latest version of this license is in
+%   http://www.latex-project.org/lppl.txt
+% and version 1.3 or later is part of all distributions of LaTeX
+% version 2005/12/01 or later.
+%
+% This work has the LPPL maintenance status `maintained'.
+% 
+% The Current Maintainer of this work is J. Wirth.
+%
+% This work consists of the files: 
+%       EXnSOL.sty  instructions.tex
+%       instructions.pdf 
+%       README 
+
+% 
+\NeedsTeXFormat{LaTeX2e}[1999/12/01]
+\ProvidesPackage{EXnSOL}[2024/01/16 ex]
+% \RequirePackage{environ} % Allows environments with conditions
+\RequirePackage{verbatim} % Um konditionale robuste Umgebungen zu schaffen
+\RequirePackage{etoolbox} % 
+\RequirePackage{totcount} % 
+\usepackage[dvipsnames]{xcolor}
+\RequirePackage{oplotsymbl} % requires xcolor, for the AFB symbols 
+\RequirePackage{tikz} % 
+\RequirePackage{xstring} % Required to derive gap size from solution word
+\RequirePackage{xhfill} % For better lines in cloze texts
+\RequirePackage{suffix} % To create macros with an asterisk more easily
+\RequirePackage{tabto} % To calculate a line break in cloze text
+\RequirePackage[normalem]{ulem} % Offers striking out and crossing out. 
+\RequirePackage[shortlabels,inline]{enumitem} % Offers possibility to create user-list-formats
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%% Boolean Flags (Toggle) %%%%%%%%%%%%%%%%
+\newtoggle{solmode} % Signalisiert, dass der Modus aktiviert ist, impliziert normalerweise auch showsol=TRUE und showsup=FALSE
+\newtoggle{showsol} % Boolean Flag: Show Solutions
+\newtoggle{showsup} % Boolean Flag: Show suppleplements
+\toggletrue{showsup}
+\newtoggle{showafb} % Show Task requirement category (Flag) RqC
+\toggletrue{showafb} % Switch true Boolean
+\newtoggle{showpoints} % 
+\toggletrue{showpoints}
+\newtoggle{showtasktext} % Schalter um Aufgabentext auszugegeben
+\toggletrue{showtasktext}
+\newtoggle{showsolutiontitle} % Zeige eine Überschrift über der Lösung
+\togglefalse{showsolutiontitle}
+\newtoggle{bonuspoints} % Bonuspunkte ja oder nein
+\togglefalse{bonuspoints} % Voreingestellt: keine Bonuspunkte
+\newtoggle{nototal} % TRUE wenn nicht erwünscht ist, dass Punkte aufsummiert werden
+\togglefalse{nototal}
+\newtoggle{aftercounterreset} % Flag to signal input-repetition to avoid error-warnings 
+\togglefalse{aftercounterreset}
+\newtoggle{framedfield}
+\togglefalse{framedfield}
+\newtoggle{PDFform} % TRUE if the goal is to make a PDF-form
+\togglefalse{PDFform} % Default ist a paper-exam.
+
+% Toggles: solmode, showsol,showsup, showafb, showpoints, showtasktext, bonuspoints,nototal, aftercounterreset
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Counter %%%%%%%%%%%%%%%%%%%%%%
+\newcounter{pts}
+\global\defcounter{pts}{0}
+\newcounter{bonuspts}
+\global\defcounter{bonuspts}{0}
+\newcounter{subpts} % Unterpunkte
+\newtotcounter{totpts}
+\newtotcounter{bonustotpts}
+\newcounter{konto} % 0 = Punkte ohne Kategorie, 1 = AFB I, 2 = AFB II, 3 = AFB III
+\setcounter{konto}{0} 
+\newcounter{exppts} % Expectation points of a sample solution
+\newtotcounter{alltasks} % Anzahl der bepunkteten Aufgaben
+\newtotcounter{bonustasks} % Anzahl der Bonus-Aufgaben
+\newtotcounter{afbI} \newtotcounter{afbII}  \newtotcounter{afbIII} % Anforderungsbereiche (AFB)
+\regtotcounter{page} 
+\newtotcounter{expages} % Speichert bei allinone-Versionen die Seitenzahl vom Aufgabenteil
+\newcounter{errornr} % Zähler für Fehlernummer beim Aufgabentyp Finde-den-Fehler
+\newcounter{subtasknumber}
+\setcounter{subtasknumber}{0}
+\newcounter{tasknumber}
+\setcounter{tasknumber}{0}
+\newcounter{material} % Zähler für Materialien
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% Lengths %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newlength{\baslu} % basic length unit, die Bezugsgröße für Eingabefeldbemessungen
+\setlength{\baslu}{5mm} % Festlegung der Längenbezugsgröße für Eingabefeldbemessungen
+\newlength{\bigtaskbodyindent}
+\setlength{\bigtaskbodyindent}{2.5em}
+\newlength{\bigsubtaskbodyindent}
+\setlength{\bigsubtaskbodyindent}{2.5em}
+\newlength{\smalltaskbodyindent}
+\setlength{\smalltaskbodyindent}{2.2em}
+\newlength{\smallsubtaskbodyindent}
+\setlength{\smallsubtaskbodyindent}{2.2em}
+\newlength{\taskbodyindent}
+\setlength{\taskbodyindent}{\smalltaskbodyindent}
+\newlength{\subtaskbodyindent}
+\setlength{\subtaskbodyindent}{\smallsubtaskbodyindent}
+\newlength{\subtasklabelindent} % Einrückung des Unteraufgabenlabels
+\setlength{\subtasklabelindent} {0.2em}
+\newlength{\indentinputfield} % Einzug des Eingabefeldes
+\setlength{\indentinputfield}{\taskbodyindent} % Initialwert für Eingabefeldeinzug
+\newlength{\solbodyindent}
+\setlength{\solbodyindent}{2.5em}
+\newlength{\tabpoints}
+\setlength{\tabpoints}{12cm}
+\newlength{\vavpts} % Länge = vertikaler Anpassungswert (vertical adjustmentvalue points) für Punkteausdruck am Rand
+\setlength{\vavpts}{-1.5ex}
+\newlength{\laenge}	% Für das Lückentextmakro
+\newlength{\fillinletterlength}
+\setlength{\fillinletterlength}{5mm} % Länge eines Buchstabens in einer Lücke
+\newdimen\spaceleft % Benötigt von Macro von Raven https://tex.stackexchange.com/questions/466240/filling-page-with-a-tikz-grid-using-modulus-on-variables
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%% Color-Definitions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\definecolor{excolor}{rgb}{0,0,0} % Farbe für Aufgaben ...
+\definecolor{solcolor}{rgb}{1,0,0} % Farbe der Lösungen
+\definecolor{gridcolor}{rgb}{0.5,0.4,0.6} % Farbe Karos in Antwortfeld
+\definecolor{linecolor}{rgb}{0.3,0.3,0.5} % Farbe Linien in Antwortfeld
+\definecolor{smallgraphcolor}{rgb}{1,0.698,0.4} % Farbe Millimeterpapier kleine Kästchen
+\definecolor{mediumgraphcolor}{rgb}{1,0.502,0} % Farbe Millimeterpapier mittlere Kästchen
+\definecolor{biggraphcolor}{rgb}{1,0.698,0.4} % Farbe Millimeterpapier kleine Kästchen
+\definecolor{framecolor}{rgb}{0,0,0} % Farbe Rahmen um Antwortfeld
+\definecolor{ptscolor}{RGB}{165,42,42} % Farbe für die Punkte 
+\definecolor{bonusptscolor}{RGB}{9, 121, 105} % Farbe für die Punkte
+\definecolor{expptscolor}{rgb}{0,0,0} % Farbe der Erwartungspunkte
+\definecolor{afbcolor}{RGB}{165,42,42} %Farbe für AFB-Symbole
+%
+
+%%%%%%%%%%%%%%%%%% text modules %%% Textbausteine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\ptslabel}{P.} % Zeichen nach der Punktezahl
+\newcommand{\bonusptslabel}{BP} % Zeichen nach der Punktezahl
+\newcommand{\ptsprefix}{\makebox[5mm]{\xdotfill[-0.5ex]{0.5pt}}\thinspace /\thinspace} % Zeichen vor der Punktezahl in EX
+\newcommand{\ptssuffix}{\thinspace \textit{\ptslabel}} % Zeichen nach Punktezahl in EX
+\newcommand{\bonusptsprefix}{\makebox[5mm]{\xdotfill[-0.5ex]{0.5pt}}\thinspace /\thinspace} % Zeichen vor der Punktezahl in EX
+\newcommand{\bonusptssuffix}{\thinspace \textit{\bonusptslabel}} % Zeichen nach Punktezahl in EX
+\newcommand{\SOLptsprefix}{(} % Zeichen vor Punktezahl in der Kontrolle
+\newcommand{\SOLptssuffix}{\ptslabel )} % Zeichen nach Puntkte in Kontrolle
+\newcommand{\SOLbptsprefix}{(} % Zeichen vor Punktezahl in der Kontrolle
+\newcommand{\SOLbptssuffix}{*)} % Zeichen nach Bonuspuntkte in Kontrolle
+\newcommand{\sollabel}{} % Zeichen bei der Listenumgebung für die Lösung
+\newcommand{\subptsprefix}{(} % Zeichen vor der Unteraufgabenpunktzahl.
+\newcommand{\subptssuffix}{\ptslabel)} % Zeichen nach der Unteraufgabenpunktzahl
+\newcommand{\materiallabel}{M} % Label für den Zähler "Material"
+\newcommand{\materialname}{Material} % Materialcaptionname
+
+
+\renewcommand{\thematerial}{\materiallabel\arabic{material}}
+
+\newcommand{\material}[1]{ % Kleingeschrieben ohne vorangestellten Materialnamen
+	\refstepcounter{material}
+	\textbf{\thematerial: #1}}
+	
+\newcommand{\Material}[1]{ % 
+	\refstepcounter{material}
+	\textbf{\materialname\thinspace\thematerial: #1}}
+	
+
+\newcommand{\soltitlepretext}{Solutions for}
+\newcommand{\correctsign}{$\surd$} % Bei Falsch-Richtig-Aufgaben das Korrektzeichen
+\newcommand{\falsesign}{ \thinspace f \thinspace }
+\newcommand{\leftoptionlimiter}{[}
+\newcommand{\rightoptionlimiter}{]}
+\newcommand{\taskprefix}{} % Vor dem Aufgabenzähler
+\newcommand{\tasksuffix}{.} % Hinter dem Aufgabenzähler
+\newcommand{\subtaskprefix}{\hspace*{\subtasklabelindent}} % Vor dem Unteraufgabenzähler
+\newcommand{\subtasksuffix}{)} % Hinter dem Unteraufgabenzähler
+\newcommand{\solutiontitle}{} % Überschrift über Lösungen
+%\newcommand{\exoutfilename}{\jobname-out}
+\newcommand{\tempstr}{xxx}
+
+%********************* Titel ******************************
+\newcommand{\extitle}{Questions}
+\newcommand{\soltitle}{Solutions}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%  Makros %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\newcommand{\showAFB}{%
+	\toggletrue{showafb}
+	\setlength{\taskbodyindent}{\bigtaskbodyindent}	
+	\setlength{\subtaskbodyindent}{\bigsubtaskbodyindent}
+}
+
+\newcommand{\notshowAFB}{%
+	\togglefalse{showafb}	
+	\setlength{\taskbodyindent}{\smalltaskbodyindent}	
+	\setlength{\subtaskbodyindent}{\smallsubtaskbodyindent}
+
+}
+
+\newcommand{\noafbsymbol}{\iftoggle{showafb}{\textsuperscript{\circlet[white]}}{}} % Symbol bei keinem AFB
+\newcommand{\afbIicon}{\iftoggle{showafb}{\textsuperscript{\circlet[afbcolor]}}{}} % Symbol AFB I
+\newcommand{\afbIIicon}{\iftoggle{showafb} {\textsuperscript{\circletfillhb[afbcolor]}}{}} % Symbol AFB I
+\newcommand{\afbIIIicon}{\iftoggle{showafb} {\textsuperscript{\circletfill[afbcolor]}}{}} % Symbol AFB I
+\newcommand{\afbI}{\setcounter{konto}{1}} 
+\newcommand{\afbII}{\setcounter{konto}{2}}
+\newcommand{\afbIII}{\setcounter{konto}{3}} 
+
+\newcommand{\totalPoints}{\total{totpts}} % Gibt die Gesamtpunktzahl aus.
+
+\newcommand{\setPoints}[1]{\stepcounter{alltasks}\setcounter{pts}{#1}%
+	\iftoggle{nototal}{}{ % Wenn nototal dann werden Punkte nicht aufaddiert
+	\addtocounter{totpts}{#1}
+	\ifnumequal{\value{konto}}{1}{\addtocounter{afbI}{#1}}{\ifnumequal{\value{konto}}{2} {\addtocounter{afbII}{#1}}{\ifnumequal{\value{konto}}{3} {\addtocounter{afbIII}{#1}}{}}} 	
+}
+\global\defcounter{konto}{0} % Setze Punktekonto auf keine Kategorie = 0
+}
+
+\newcommand{\setBonusPoints}[1]{\stepcounter{alltasks}\stepcounter{bonustasks}\setcounter{bonuspts}{#1}%
+	\iftoggle{nototal}{}{ % Wenn nototal dann werden Punkte nicht aufaddiert
+		\addtocounter{bonustotpts}{#1}
+		\ifnumequal{\value{konto}}{1}{\addtocounter{afbI}{#1}}{\ifnumequal{\value{konto}}{2} {\addtocounter{afbII}{#1}}{\ifnumequal{\value{konto}}{3} {\addtocounter{afbIII}{#1}}{}}} 	
+	}
+}
+
+\newcommand{\setsubPoints}[1]{\addtocounter{subpts}{#1}} % Unterpunkteverrechnung
+
+\newcommand{\printPoints}[1][\thepts]{\iftoggle{showpoints}{% Ausgabe der Punkte
+		\color{ptscolor}
+		\iftoggle{showsol}{{\footnotesize \SOLptsprefix#1\SOLptssuffix}}{{\footnotesize \ptsprefix#1\ptssuffix}}}{}}
+	
+\newcommand{\printBonusPoints}[1][\thepts]{\iftoggle{showpoints}{% Ausgabe der Punkte
+		\color{bonusptscolor}
+		\iftoggle{showsol}{{\footnotesize \SOLbptsprefix#1\thinspace \SOLbptssuffix}}{{\footnotesize \bonusptsprefix#1\bonusptssuffix}}}{}}
+
+\newcommand{\ipts}[1]{\setPoints{#1}\printPoints} % Gedacht um Punkte im Aufgabentext zu deklarieren
+
+\newcommand{\subpts}[1]{\setsubPoints{#1}\subptsprefix #1 \subptssuffix}
+
+\newcommand{\totpts} {\total{totpts}}
+
+\newcommand{\pts}[2][\vavpts]{% Punkte an Rand schreiben und Zähler aktualisieren, opt. erstes Argument Vertikalkorrektur.
+    \normalmarginpar \marginpar{\vspace{#1}	
+    \ifstrempty{#2}{\setPoints{\thesubpts}\printPoints[\thesubpts]}{\setPoints{#2}\printPoints[#2]}}} 	
+
+\newcommand{\bonuspts}[2][\vavpts]{% Punkte an Rand schreiben und Zähler aktualisieren, opt. erstes Argument Vertikalkorrektur.
+	\normalmarginpar \marginpar{\vspace{#1}	
+		\toggletrue{bonuspoints}
+		\ifstrempty{#2}{\setBonusPoints{\thesubpts}\printBonusPoints[\thesubpts]}{\setBonusPoints{#2}\printBonusPoints[#2]}}} 	
+
+\newcommand{\expp}[1]{% Addiert die Erwartungspunkte zum Zähler exppts
+	\addtocounter{exppts}{#1}\textcolor{expptscolor}{(#1\thinspace\ptslabel)}}
+
+\newcommand{\printexppts}{\ifnumgreater{\value{exppts}}{0}{\par \textcolor{expptscolor}{(Summe:~\theexppts\thinspace\ptslabel)}}{}}
+
+\newcommand{\showsol}{\toggletrue{showsol}}
+
+
+\newcommand{\setsolutiontitle}[1]{%
+	\renewcommand{\solutiontitle}{#1}
+ \ifstrempty{\solutiontitle}{\settoggle{showsolutiontitle}{false}}{\settoggle{showsolutiontitle}{true}}	
+}
+
+\newcommand{\EXmode}{\showSUP\togglefalse{solmode}\toggletrue{showtasktext}}
+
+\newcommand{\SOLmode}[1][]{%
+	\showSOL\notshowSUP\toggletrue{solmode}\ifstrempty{#1}{}{\togglefalse{showtasktext}}}
+
+\newcommand{\showtogglevalue}[1]{\iftoggle{#1}{\textbf{1} \texttt{(\textbf{true})}}{\textcolor{red}{0} \texttt{(\textcolor{red}{false})}}}
+
+% Toggles: solmode, showsol,showsup, showafb, showpoints, showtasktext, bonuspoints,nototal, aftercounterreset
+\newcommand{\showalltogglevalues}{%
+\begin{tabular}{lll}
+	{\small }
+	\textbf{\textbf{Toggle}} & Meaning & Value \\
+	\hline
+	\textbf{solmode} & Output Mode with solutions. & \showtogglevalue{solmode}  \\
+	\textbf{showsol} & Shows the solutions. & \showtogglevalue{showsol}  \\
+	\textbf{supple} & Shows supplements. &  \showtogglevalue{showsup}  \\
+	\textbf{showpoints} & Shows points. &  \showtogglevalue{showpoints}  \\
+	\textbf{showafb} & Shows requirement categories. & \showtogglevalue{showafb} \\
+	\textbf{showtasktext} & Shows text of tasks/subtasks. & \showtogglevalue{showtasktext} \\
+	\textbf{bonuspoints} & Switch Bonuspoints on. & \showtogglevalue{bonuspoints} \\ 
+	\textbf{nototal} & Switch off summation of points.  & \showtogglevalue{bonuspoints} \\ 
+	\textbf{aftercounterreset} & Indicates reset of counters.  & \showtogglevalue{aftercounterreset} \\ 
+\end{tabular}
+}
+
+\newcommand{\showeverything}{% Show everything
+\toggletrue{showsol}\toggletrue{showsup}\toggletrue{showpoints}\toggletrue{showtasktext}\toggletrue{showafb}
+}
+
+
+\newcommand{\mcsymbol}{\squad} % Kästchen für MC-Test
+\newcommand{\mcsymbolcross}{\squadcross[solcolor]} % Angekreuztes Kästchen MC in roter Farbe
+
+\newcommand{\mci}[1][]{% Multiple Choice Item (mci)
+	\iftoggle{showsol}{\ifblank{#1}{\item[\mcsymbol]}{\item[\mcsymbolcross]}}{\item[\mcsymbol]}}
+	
+\newcommand{\EXcheck}[1][]{\iftoggle{showsol}{\ifblank{#1}{\mcsymbol}{\mcsymbolcross}}{\mcsymbol}}
+
+\newcommand{\fillinstyle}[1] {\texttt{~\large \color{solcolor}\underline{~#1~}}}
+
+\newcommand{\xgapfill}{\xrfill[-1mm]{0.3pt}[linecolor]}
+             
+
+\newcommand{\solorgap}[2][0pt]{% Lückentext
+	\tabto{\CurrentLineWidth} % um die aktuelle Zeilenposition zu speichern
+	\StrLen{#2}[\mystringlen]
+	\ifdimcomp{(\TabPrevPos + \fillinletterlength * \mystringlen+1em)}{>}{\textwidth}{\linebreak}{} % Prüft, ob die Lücke noch Platz hat, sonst Zeilenumbruch
+	\setlength{\laenge}{\fillinletterlength * \mystringlen + #1}
+	\iftoggle{showsol}{\fillinstyle{#2}}{\makebox[\laenge][c]{\xgapfill}}
+}%
+	
+\newcommand{\solorfixgap}[2][0pt]{% Lückentext mit fixer Länge mit Unterstrich
+	\iftoggle{showsol}{\fillinstyle{#2}}{\makebox[#1][c]{\xgapfill}}
+}%
+
+\WithSuffix\newcommand\solorfixgap*[2][0pt]{% Lückentext mit fixer Länge ohne Unterstrich in der Lücke
+	\iftoggle{showsol}{\fillinstyle{#2}}{\makebox[#1][c]{~}}}
+
+\WithSuffix\newcommand\solorgap*[2][0mm]{% Lücke ohne Unterstrich
+\tabto{\CurrentLineWidth} % um die aktuelle Zeilenposition zu speichern
+\StrLen{#2}[\mystringlen]
+\ifdimcomp{(\TabPrevPos + \fillinletterlength * \mystringlen+1em)}{>}{\textwidth}{\linebreak}{} % Prüft, ob die Lücke noch Platz hat, sonst Zeilenumbruch
+\setlength{\laenge}{\fillinletterlength * \mystringlen + #1}
+\iftoggle{showsol}{\textcolor{solcolor}{#2}}{\makebox[\laenge][c]{}}
+}%
+
+\newcommand{\SOL}[2][0pt]{%Lösung in Listenumgebung mit Einrückung, optional Breite des Leerraums
+	\iftoggle{showsol}{%
+	\begin{solenum}
+			\setcounter{exppts}{0}
+			\color{solcolor}
+			\item[] #2\printexppts
+	\end{solenum}{\hspace{#1}}}%
+} 
+
+\WithSuffix\newcommand\SOL*[2][0pt]{% SOL Sternvariante ohne Listenumgebung mit optionaler Breite
+	\setcounter{exppts}{0}
+	\iftoggle{showsol}{{\color{solcolor} #2}}{\hspace{#1}}
+	} % Simple Solution-Command, optional the width (default = 0pt)
+
+\newcommand{\SUP}[1]{ % Supplement, kurze Ergänzung, für längere Ergänzungen besser die Umgebung SUPv
+\iftoggle{showsup}{\begin{solenum}\item[] #1 \end{solenum}}{}
+}
+
+\WithSuffix\newcommand\SUP*[1]{% Ergänzung ohne Einrückung
+	\iftoggle{showsup}{#1}{}
+}
+
+\newcommand{\solution}[2][0pt]{\SOL[#1]{#2}} % Zwecks Abwärtskompatibilität
+
+\WithSuffix\newcommand\solution*[2][0pt]{\SOL*[#1]{#2}}
+
+
+\newcommand{\correctorfalse}[1][c]{%
+\iftoggle{showsol}{\leftoptionlimiter \textcolor{solcolor} {\ifstrequal{#1}{c}{\correctsign}{\falsesign}} \rightoptionlimiter}{%false
+ \leftoptionlimiter \quad \rightoptionlimiter}
+}
+
+\newcommand{\reseterrornr}{\setcounter{errornr}{0}} % Fehlerzähler für Finde-den-Fehler-Aufgaben
+\newcommand{\steperrornr}{\stepcounter{errornr}} % Fehlerzähler um 1 erhöhen
+
+
+\newcommand{\showerrornumber}{%
+ \steperrornr	
+ \textsuperscript{\arabic{errornr}}
+}
+
+\newcommand{\wrong}[1]{%
+ \iftoggle{showsol}{%
+	\textcolor{solcolor}{\sout{#1} \showerrornumber} 
+	}%
+	{#1} % Normaler Text wird in EX angezeigt
+}
+
+\WithSuffix\newcommand\wrong*[1]{%
+	\iftoggle{showsol}{%
+		\textcolor{solcolor}{\sout{#1}} 
+	}%
+	{#1} % Normaler Text wird in EX angezeigt
+}
+
+
+\newcommand{\ifEX}[1]{\iftoggle{solmode}{}{#1}} % Führt #1 aus wenn NICHT die Kontrolle aktiviert ist
+
+\newcommand{\ifEXelse}[2]{\iftoggle{solmode}{#2}{#1}}
+
+\newcommand{\ifSOL}[1]{\iftoggle{solmode}{ #1 }{}} % Führt #1 aus wenn die Kontrolle aktiviert ist
+ 
+\newcommand{\ifFirstTime}[1]{\iftoggle{aftercounterreset}{}{#1}} % Executes #1 only in the first round 
+
+\newcommand{\setEXtitle}[2][]{% speichert Titel der EX, optional die Ausgabe für die Kontrolle
+    \ifstrempty{#1}{}{\renewcommand{\soltitle}{#1}}	
+   	\renewcommand{\extitle}{#2}}
+   	
+\newcommand{\EXtitle}[1][r]{% Titel EX oder SOL, optional Bildung vom Lösungstitel Muster "r": Lösungstitel ersetzt Aufgabentitel, "SE": zusammengesetzt aus Lösungstitel und Aufgabentitel, "ES": zusammengesetzt aus Aufgabentitel und Lösungstitel.
+	\iftoggle{solmode}{%
+		\ifstrequal{#1}{r}{\soltitle}{%
+		\ifstrequal{#1}{SE}{\soltitle\extitle}{\extitle\soltitle}}}
+	{\extitle}
+}
+
+\newcommand{\formatquestiontitle}[1]{ \textbf{#1}\par } % Formatierung des Fragentitels
+
+\newcommand{\formatsubquestiontitle}[1]{\textbf{#1}\par} % Formatierung der Unterfrage
+
+
+%%%% Aufgabennummerierungen mit Label-Makros %%%%%%%%%%%%%%%% 
+
+\newcommand{\taskcounter}{\arabic{exenumi}}
+
+\newcommand{\tasklabelcore}{\textbf{\taskprefix\taskcounter\tasksuffix}}
+
+\newcommand{\settaskprefix}[2][0 pt]{\renewcommand{\taskprefix}{\hspace*{#1}#2}}
+\newcommand{\settasksuffix}[2][0pt]{\renewcommand{\tasksuffix}{#2\hspace{#1}}}
+
+\newcommand{\settaskcounterstyle}[1]{%
+ \ifstrequal{#1}{arabic}{\renewcommand{\taskcounter}{\arabic{exenumi}}}{}
+ \ifstrequal{#1}{roman}{\renewcommand{\taskcounter}{\roman{exenumi}}}{}
+ \ifstrequal{#1}{Roman}{\renewcommand{\taskcounter}{\Roman{exenumi}}}{}
+ \ifstrequal{#1}{alph}{\renewcommand{\taskcounter}{\alph{exenumi}}}{}
+ \ifstrequal{#1}{Alph}{\renewcommand{\taskcounter}{\Alph{exenumi}}}{}
+}
+
+\newcommand{\subtaskcounter}{\alph{subexenumi}}
+\newcommand{\subtasklabelcore}{\textbf{\subtaskprefix\subtaskcounter \subtasksuffix}}
+
+\newcommand{\setsubtaskprefix}[2][\subtasklabelindent]{\renewcommand{\subtaskprefix}{\hspace*{#1}#2}}
+\newcommand{\setsubtasksuffix}[2][0pt]{\renewcommand{\subtasksuffix}{#2\hspace{#1}}}
+
+\newcommand{\setsubtaskcounterstyle}[1]{%
+	\ifstrequal{#1}{arabic}{\renewcommand{\subtaskcounter}{\arabic{subexenumi}}}{}
+	\ifstrequal{#1}{roman}{\renewcommand{\subtaskcounter}{\roman{subexenumi}}}{}
+	\ifstrequal{#1}{Roman}{\renewcommand{\subtaskcounter}{\Roman{subexenumi}}}{}
+	\ifstrequal{#1}{alph}{\renewcommand{\subtaskcounter}{\alph{subexenumi}}}{}
+	\ifstrequal{#1}{Alph}{\renewcommand{\subtaskcounter}{\Alph{subexenumi}}}{}
+}
+
+\newcommand{\settaskbodyindent}[1]{\setlength{\taskbodyindent}{#1}}
+
+\newcommand{\setsubtaskbodyindent}[1]{\setlength{\subtaskbodyindent}{#1}}
+
+\newlist{exenum}{enumerate}{1} 
+
+\setlist[exenum]{%
+	align=left,
+	label=\tasklabelcore,
+	itemindent=0pt,
+	labelsep=0pt,
+	leftmargin=\taskbodyindent,
+	labelwidth=\taskbodyindent}
+
+\newlist{subexenum}{enumerate}{1} \setlist[subexenum]{%
+	align=left,label=\subtasklabelcore,itemindent=0pt,labelsep=0pt,leftmargin=\subtaskbodyindent,
+	labelwidth=\subtaskbodyindent}
+
+\newlist{supplenum}{description}{1}
+
+\setlist[supplenum,1]{%
+align=left,itemindent=0pt,labelsep=0pt,
+leftmargin=\taskbodyindent,labelwidth=\taskbodyindent}
+
+\newlist{solenum}{description}{1}
+
+\setlist[solenum,1]{%
+	align=left,itemindent=0pt,labelsep=0pt,
+	leftmargin=\solbodyindent,labelwidth=\solbodyindent}
+
+
+\newcommand{\labeltask}[2]{% Aufgabe labeln mit fortlaufender Aufgabennummer und optional AFB
+	\color{excolor}
+	\ifstrempty{#1}{% Kein AFB-Label
+		\setlist*[exenum, 1]{label*=\tasklabelcore}}
+	{% mit AFB-Label
+	 \iftoggle{showafb} {\setlist*[exenum, 1]{label*=\tasklabelcore#1}}{\setlist*[exenum, 1]{label*=\tasklabelcore}}
+    }
+	\begin{exenum}[resume=tasks]
+		\item \iftoggle{showtasktext}{#2}{}
+	\end{exenum}	
+}
+
+\newcommand{\labeltitledtask}[3]{% Aufgabe labeln mit fortlaufender Aufgabennummer und optional AFB
+	\color{excolor}
+	\ifstrempty{#1}{% Kein AFB-Label
+\setlist*[exenum, 1]{label*=\tasklabelcore}}	
+	{% mit AFB-Label
+		\iftoggle{showafb} {\setlist*[exenum, 1]{label*=\tasklabelcore#1}}{}}
+
+	\begin{exenum}[resume]
+		\item \iftoggle{showtasktext}{\formatquestiontitle{#2}}{}
+		\item[] \iftoggle{showtasktext}{#3}{}
+	\end{exenum}	
+}	
+
+\newcommand{\labelsubtask}[2]{% Unteraufgabe labeln mit fortlaufender Aufgabennummer und optional AFB
+	\color{excolor}
+	\ifstrempty{#1}{\setlist*[subexenum, 1]{label*=\subtasklabelcore#1}}{\iftoggle{showafb}{\setlist*[subexenum, 1]{label*=\subtasklabelcore#1}}{\setlist*[subexenum, 1]{label*=\subtasklabelcore#1}}}
+	\begin{subexenum}[resume]
+		\item \iftoggle{showtasktext}{#2}{}
+	\end{subexenum}
+}
+
+\newcommand{\labeltitledsubtask}[3]{% Unteraufgabe mit zwei Absätzen
+	\color{excolor}
+	\ifstrempty{#1}{\setlist*[subexenum, 1]{label*=\subtasklabelcore#1}}{\iftoggle{showafb}{\setlist*[subexenum, 1]{label*=\subtasklabelcore#1}}{\setlist*[subexenum, 1]{label*=\subtasklabelcore#1}}}
+	
+	\begin{subexenum}[resume]
+		\item \iftoggle{showtasktext}{#2}{}
+		\item \iftoggle{showtext}{#3}{}  
+	\end{subexenum}	
+}
+
+\newcommand{\EX}[2][]{%
+	\restartlist{subexenum}
+	\setcounter{subpts}{0}
+	\ifstrempty{#1}{\labeltask{}{#2} }{% NOT EMPTY
+		\ifstrequal{#1}{I}{\afbI \labeltask {\afbIicon}{#2} }{% NOT I
+			\ifstrequal{#1}{II}{\afbII \labeltask {\afbIIicon}{#2} } {% NOT II
+				\ifstrequal{#1}{III}{\afbIII \labeltask {\afbIIIicon}{#2} }{% NOT III
+					\labeltask {#1}{#2} } } }
+	}
+\par}
+
+
+\newenvironment{EXv}[1][]{% Robuste Umgebung für Aufgaben mit Verbatim-Inhalten
+	\restartlist{subexenum}
+	\setcounter{subtasknumber}{1}
+	\ifstrempty{#1}{}{%
+		\ifstrequal{#1}{I}{\afbI \setlist*[exenum, 1]{label*=\tasklabelcore\afbIicon}}{
+	\ifstrequal{#1}{II}{\afbII \setlist*[exenum, 1]{label*=\tasklabelcore\afbIIicon}}{\ifstrequal{#1}{II}{\afbIII \setlist*[exenum,1]{label*=\tasklabelcore\afbIIicon}}{\setlist*[exenum, 1]{label*=\tasklabelcore#1}}	
+	}}
+}
+	\begin{exenum}[resume]
+		\item 
+}{\end{exenum}}
+
+\newenvironment{EXv*}{\restartlist{subexenum} \setcounter{subtasknumber}{1}}{}
+
+\newenvironment{EXswap}{%
+	\begin{filecontents*}[overwrite]{\jobname.exswap}%
+	}{%
+	\end{filecontents*}\relax \input{\jobname.exswap}} % lagert den Inhalt in eine Datei aus und fügt ihn im Aufgabenmodus wieder ein.
+
+
+\WithSuffix\newcommand\EX*[1]{\restartlist{subexenum}\setcounter{subpts}{0}\iftoggle{showtasktext}{#1}{}} % Aufgaben ohne Listenformatierung
+
+%\newcounter{pts}
+%\global\defcounter{pts}{0}
+%\newcounter{bonuspts}
+%\global\defcounter{bonuspts}{0}
+%\newcounter{subpts} % Unterpunkte
+%\newtotcounter{totpts}
+%\newtotcounter{bonustotpts}
+%\newcounter{konto} % 0 = Punkte ohne Kategorie, 1 = AFB I, 2 = AFB II, 3 = AFB III
+%\setcounter{konto}{0} 
+%\newcounter{exppts} % Expectation points of a sample solution
+%\newtotcounter{alltasks} % Anzahl der bepunkteten Aufgaben
+%\newtotcounter{bonustasks} % Anzahl der Bonus-Aufgaben
+%\newtotcounter{afbI} \newtotcounter{afbII}  \newtotcounter{afbIII} % Anforderungsbereiche (AFB)
+%\regtotcounter{page} 
+%\newcounter{errornr} % Zähler für Fehlernummer beim Aufgabentyp Finde-den-Fehler
+%\newcounter{subtasknumber}
+%\setcounter{subtasknumber}{0}
+
+\newcommand{\EXreset}{% setzt alle Counter zurück: Listencounter, figure
+	\toggletrue{aftercounterreset} % Signal to show that things could be inserted a second time
+	\setcounter{figure}{0}
+	\setcounter{equation}{0}
+	\setcounter{table}{0}
+	\restartlist{exenum}
+	\restartlist{supplenum}
+	\setcounter{tasknumber}{0}
+	\setcounter{subtasknumber}{0}
+	\setcounter{totpts}{0}
+	\setcounter{bonustotpts}{0}
+	\setcounter{afbI}{0} \setcounter{afbII}{0}  \setcounter{afbIII}{0} % Anforderungsbereiche (AFB)
+	\setcounter{expages}{\value{page}}
+	\setcounter{part}{0}
+	\setcounter{section}{0}
+	\setcounter{footnote}{0}
+}
+
+
+\newcommand{\titledEX}[3][]{%
+	\restartlist{subexenum}
+	\setcounter{subpts}{0}
+	\ifstrempty{#1}{\labeltitledtask{}{#2}{#3}}{% NOT EMPTY
+		\ifstrequal{#1}{I}{\afbI \labeltitledtask{\afbIicon}{#2}{#3}}{% NOT I
+			\ifstrequal{#1}{II}{\afbII \labeltitledtask{\afbIIicon}{#2}{#3} } {% NOT II
+				\ifstrequal{#1}{III}{\afbIII \labeltitledtask{\afbIIIicon}{#2}{#3} }{% NOT III
+					\labeltitledtask{#1}{#2}{#3} } } }
+	}
+}
+
+\WithSuffix\newcommand\titledEX*[2]{
+	\setcounter{subpts}{0}
+	\formatquestiontitle{#1}#2
+}
+
+
+\newcommand{\subEX}[2][]{% Unteraufgabe
+	\setcounter{subpts}{0}
+	\ifstrempty{#1}{\labelsubtask{}{#2}}{	
+		\ifstrequal{#1}{I}{\afbI\labelsubtask{\afbIicon}{#2}}{}
+		\ifstrequal{#1}{II}{\afbII\labelsubtask{\afbIIicon}{#2}}{}
+		\ifstrequal{#1}{III}{\afbIII\labelsubtask{\afbIIIicon}{#2}}{}
+	}
+}
+
+\newenvironment{subEXv}[1][]{% Robuste Umgebung für Aufgaben mit Verbatim-Inhalten
+	\setcounter{subpts}{0}
+	\ifstrempty{#1}{}{%
+		\ifstrequal{#1}{I}{\afbI \setlist*[subexenum, 1]{label*=\subtasklabelcore\afbIicon}}{
+			\ifstrequal{#1}{II}{\afbII \setlist*[subexenum, 1]{label*=\subtasklabelcore\afbIIicon}}{\ifstrequal{#1}{II}{\afbIII \setlist*[subexenum,1]{label*=\tasklabelcore\afbIIicon}}{\setlist*[subexenum, 1]{label*=\subtasklabelcore#1}}	
+		}}
+	}
+	\begin{subexenum}[resume=subextasks,start=\value{subtasknumber}]
+		\item 
+	}{\end{subexenum}\stepcounter{subtasknumber}}
+
+
+\newcommand{\titledsubEX}[3][f]{%
+	\setcounter{subpts}{0}
+	\ifstrequal{#1}{f}{\labeltitledsubtask{}{#2}{#3}}{% NOT EMPTY, NOT f	
+		\ifstrequal{#1}{I}{\afbI \labeltitledsubtask{\afbIicon}{#2}{#3}}{% NOT I
+			\ifstrequal{#1}{II}{\afbII \labeltitledsubtask{\afbIIicon}{#2}{#3} } {% NOT II
+				\ifstrequal{#1}{III}{\afbIII \labeltitledsubtask{\afbIIIicon}{#2}{#3} }{% NOT III
+					\labeltitledsubtask{#1}{#2}{#3} } } }
+	}
+}
+
+
+\newcommand{\EXmatch}[3][B]{% Zuordnungsaufgaben #2 zu #3. #1 ist das Zeichen zur Zuordnung. Standard: #2 = #3
+	\ifstrequal{#1}{=}{% #1="="
+		\iftoggle{showsol}{#2 = \textcolor{solcolor}{#3}}{#2 #1 ~~~~}}{% #1 nicht "="
+			\ifstrequal{#1}{(}{% #1 = "("
+				\iftoggle{showsol}{#2  (\textcolor{solcolor}{#3})}{#2 (~~~~)}}{% #1 weder "=" noch "("
+				 \iftoggle{showsol}{#2 [\textcolor{solcolor}{#3}]}{#2 [~~~~]}}					 
+}}
+
+\newcommand{\formatcontroltitle}[1]{{\large \textbf{\textcolor{solcolor}{#1}}\par}}
+
+%%%%% Input Field Options 
+
+%\newcommand{\calcboxnumber}{% Calculates the number of boxes to fit \linewidth, output: \boxnumber
+%	\dimdef\exlaenge{\linewidth-\indentinputfield}
+%	\pgfmathtruncatemacro\baslunumber{round(0.351459804*\baslu}
+%	\pgfmathtruncatemacro\boxnumber{ceil(0.351459804*\exlaenge)/\baslunumber}} % Zahlenwert einer Länge in Millimetern
+	
+\newcommand{\calcboxestoendofline}[1][0pt]{%
+	\dimdef\exlaenge{\linewidth-#1} % #1 = length for adjustments
+	\pgfmathtruncatemacro\baslunumber{round(0.351459804*\baslu}%
+	\pgfmathtruncatemacro\maxboxesX{ceil(0.351459804*\exlaenge)/\baslunumber}% result is the max number of boxes to end of line
+}
+
+%\newlength{\remaininglength}
+%
+%\newcommand{\calcboxestoendofpage}[1][\baselineskip]{
+%	\pgfmathtruncatemacro\baslunumber{round(0.351459804*\baslu}
+%	\pgfmathtruncatemacro\boxnumber{ceil(0.351459804*\)/\baslunumber}	
+%	\dimdef{\restofpage}{\pagegoal-\pagetotal-\baselineskip\relax} % Uses etoolbox to calculate dimensions
+%	\pgfmathtruncatemacro\maxboxesY{ceil(0.351459804*\remaininglength)/\baslunumber} % result is the max number of boxes to the end of page	
+%}
+
+
+\newcommand{\setindentinputfield}[1][\leftmargin]{%
+	\setlength{\indentinputfield}{#1}
+	\calcboxnumber} % Einrücken Eingabefeld
+
+
+\newcommand{\blankfield}[2][666]{%  Höhe = baslu, 666: Signal to put linelength
+	\iftoggle{showsol}{}{%
+		\noindent
+		\begin{solenum}
+			\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+		\item \tikz[x=\baslu,y=\baslu] \iftoggle{framedfield}{\draw[draw=linecolor]}{\draw[color=white]} (0,0) rectangle (\maxx, #2);
+		\end{solenum}
+	
+}}
+
+\WithSuffix\newcommand\blankfield* [2][666]{%  Höhe = baslu, 666: Signal to put linelength
+	\iftoggle{showsol}{}{%
+		\noindent
+		\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+		\tikz[x=\baslu,y=\baslu] \iftoggle{framedfield}{\draw[draw=linecolor]}{\draw[color=white]} (0,0) rectangle (\maxx, #2);
+	}}
+
+%\newcommand{\framedfield}[2][666]{%  Höhe = baslu, 666: Signal to put linelength
+%	\iftoggle{showsol}{}{%
+%		\noindent
+%		\begin{solenum}
+%			\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+%			\item \tikz[x=\baslu,y=\baslu] \draw[color=linecolor] (0,0) rectangle (\maxx, #2);
+%		\end{solenum}
+%	
+%}}
+
+%\WithSuffix\newcommand\framedfield* [2][666]{%  Höhe = baslu, 666: Signal to put linelength
+%	\iftoggle{showsol}{}{%
+%		\noindent
+%		\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+%		\tikz[x=\baslu,y=\baslu] \draw[color=linecolor] (0,0) rectangle (\maxx, #2);}}
+
+
+\newcommand{\rframedfield}[2][666]{%  Höhe = baslu, 666: Signal to put linelength
+		\iftoggle{showsol}{}{%
+		\noindent	
+		\begin{solenum}
+			\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+			\item \tikz[x=\baslu,y=\baslu] \draw[color=linecolor,rounded corners] (0,0) rectangle (\maxx, #2);
+		\end{solenum}
+	}}
+
+\WithSuffix\newcommand \rframedfield* [2][666]{%  Höhe = baslu, 666: Signal to put linelength
+	\iftoggle{showsol}{}{%
+		\noindent	
+		\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+		\tikz[x=\baslu,y=\baslu] \draw[color=linecolor,rounded corners] (0,0) rectangle (\maxx, #2);
+}}
+
+
+\newcommand{\gridfield}[2][666]{%
+	\iftoggle{showsol}{}{% Examensmodus
+		\noindent
+		\begin{solenum}
+			\item 
+			\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+			\tikz[x=\baslu,y=\baslu] \draw[step=\baslu,very thin, gridcolor] (0,0) grid (\maxx,#2);
+		\end{solenum}
+		}}
+	
+\WithSuffix \newcommand \gridfield* [2][666]{%
+	\iftoggle{showsol}{}{% Examensmodus
+		\noindent
+		\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+		\tikz[x=\baslu,y=\baslu] \draw[step=\baslu,very thin, gridcolor] (0,0) grid (\maxx,#2);
+}}
+	
+
+\newcommand{\chargridfield}[3][666]{%
+	\iftoggle{showsol}{}{% Examensmodus
+		\noindent
+		\hspace*{\indentinputfield}
+		\begin{solenum}
+			\item 
+			\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+			\begin{tikzpicture}[x=\baslu, y=\baslu] % Setzt die Einheit auf 1cm
+					\tiny
+				% Zeichnet ein Gitter von Punkten	
+				\iftoggle{framedfield}{%
+					\numdef{\cY}{#2-1}
+					\numdef{\cX}{\maxx-1}
+					\draw[color=linecolor] (0,0) rectangle (\maxx,#2);
+					\foreach \x in {1,...,\cX} { % X-Richtung: 11 Punkte (von 0 bis 10)
+						\foreach \y in {1,...,\cY} { % Y-Richtung: 13 Punkte (von 0 bis 12)
+							\node at (\x,\y) [color=gridcolor] {#3}; }}
+				}{%
+					\foreach \x in {0,1,...,\maxx} { % X-Richtung: 11 Punkte (von 0 bis 10)
+						\foreach \y in {0,1,...,#2} { % Y-Richtung: 13 Punkte (von 0 bis 12)
+							\node at (\x,\y) [color=gridcolor] {#3}; }}
+				}
+			\end{tikzpicture}     
+		\end{solenum}		
+}}
+
+
+\WithSuffix\newcommand\chargridfield* [3][666]{%
+	\iftoggle{showsol}{}{% Examensmodus
+		\noindent
+		\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+		 \begin{tikzpicture}[x=\baslu, y=\baslu] % Setzt die Einheit auf 1cm
+			\tiny
+			% Zeichnet ein Gitter von Punkten	
+			\iftoggle{framedfield}{%
+				\numdef{\cY}{#2-1}
+				\numdef{\cX}{\maxx-1}
+				\draw[color=linecolor] (0,0) rectangle (\maxx,#2);
+				\foreach \x in {1,...,\cX} { % X-Richtung: 11 Punkte (von 0 bis 10)
+				\foreach \y in {1,...,\cY} { % Y-Richtung: 13 Punkte (von 0 bis 12)
+					\node at (\x,\y) [color=gridcolor] {#3}; }}
+			}{%
+			\foreach \x in {0,1,...,\maxx} { % X-Richtung: 11 Punkte (von 0 bis 10)
+				\foreach \y in {0,1,...,#2} { % Y-Richtung: 13 Punkte (von 0 bis 12)
+					\node at (\x,\y) [color=gridcolor] {#3}; }}
+			}
+		\end{tikzpicture}     
+}}
+
+
+	
+\newcommand{\fillwithgrid}[1][0pt]{% Füllt den Rest der Seite mit Karos
+	\ifEX{%
+		\begin{solenum}
+			\item
+			\dimdef{\spaceleft}{\textheight-\pagetotal-14pt}
+			\pgfmathsetmacro{\gridWidth}{(\textwidth-#1) - mod(\textwidth-#1,\baslu)}
+			\pgfmathsetmacro{\gridHeight}{\spaceleft - mod(\spaceleft,\baslu)}
+			\begin{tikzpicture}
+				\draw [step=\baslu,very thin, gridcolor] (0,0) grid (\gridWidth pt,\gridHeight pt);
+			\end{tikzpicture}
+			
+		\end{solenum}
+	}	}
+
+\WithSuffix\newcommand \fillwithgrid* [1][0pt]{% Füllt den Rest der Seite mit Karos
+	\ifEX{%
+			\dimdef{\spaceleft}{\textheight-\pagetotal-14pt}
+			\pgfmathsetmacro{\gridWidth}{(\textwidth-#1) - mod(\textwidth-#1,\baslu)}
+			\pgfmathsetmacro{\gridHeight}{\spaceleft - mod(\spaceleft,\baslu)}
+			\begin{tikzpicture}\draw [step=\baslu,very thin, gridcolor] (0,0) grid (\gridWidth pt,\gridHeight pt);\end{tikzpicture}
+}}
+
+
+\newcommand{\graphfield}[2][666]{ % Millimeterpapier
+	\noindent
+	\iftoggle{showsol}{}{% Examensmodus
+	\begin{solenum}
+			\item 
+			\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}	
+			\begin{tikzpicture}[x=\baslu, y=\baslu]%
+			\draw[step=0.2\baslu, line width=0.1mm, smallgraphcolor] (0,0) grid (\maxx,#2);
+			\draw[step=\baslu, line width=0.1mm, mediumgraphcolor] (0,0) grid (\maxx,#2);
+			\draw[step=2\baslu, line width=0.2mm, biggraphcolor] (0,0) grid (\maxx,#2);
+		\end{tikzpicture}		
+	\end{solenum}}}
+	
+\WithSuffix\newcommand\graphfield* [2][666]{ % Millimeterpapier ohne Einzug
+	\noindent
+	\iftoggle{showsol}{}{% Examensmodus
+		\ifnumequal{#1}{666}{\calcboxestoendofline \numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}	
+		\begin{tikzpicture}[x=\baslu, y=\baslu]%
+			\draw[step=0.2\baslu, line width=0.1mm, smallgraphcolor] (0,0) grid (\maxx,#2);
+			\draw[step=\baslu, line width=0.1mm, mediumgraphcolor] (0,0) grid (\maxx,#2);
+			\draw[step=2\baslu, line width=0.2mm, biggraphcolor] (0,0) grid (\maxx,#2);
+	\end{tikzpicture}}}	
+			
+\newsavebox{\exlinestyle}
+\savebox{\exlinestyle}{dashed,color=red}
+
+\newcommand{\setEXlinestyle}[1]{\tikzstyle{EXline}=[#1]}
+
+\setEXlinestyle{solid,thin,color=linecolor}
+
+\newcommand{\linedfield}[2][666]{% Linien, Breite in Vielfachen von 5mm  Anzahl der Zeilen.
+	\iftoggle{showsol}{}{%
+	\noindent	
+	\ifnumcomp{#2}{>}{0}{\numdef{\linesmax}{#2-1}}{\numdef{\linesmax}{1}}%
+	\begin{solenum}
+		\item\ifnumequal{#1}{666}{\calcboxestoendofline\numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}%
+	\begin{tikzpicture}[x=\baslu, y=2\baslu]%
+		\draw[white] (0,0) -- (0,\linesmax+0.5);\foreach \i in {0,...,\linesmax} \draw[EXline] (0,\i) -- (\maxx,\i);
+		\iftoggle{framedfield}{\numdef{\recy}{#2\baslu+#2\baslu}\draw[draw=framecolor] (0,0) rectangle (\maxx\baslu,\recy);}{}
+	\end{tikzpicture}
+	\end{solenum} }}
+
+\WithSuffix\newcommand\linedfield* [2][666]{% Linien, Breite in Vielfachen von 5mm  Anzahl der Zeilen.
+	\iftoggle{showsol}{}{%
+	\noindent
+	\ifnumcomp{#2}{>}{0}{\numdef{\linesmax}{#2-1}}{\numdef{\linesmax}{1}}%
+	\ifnumequal{#1}{666}{\calcboxestoendofline\numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}%
+	\begin{tikzpicture}[x=\baslu, y=2\baslu]%
+		\draw[white] (0,0) -- (0,\linesmax+1);
+		\foreach \i in {0,...,\linesmax} \draw[EXline] (0,\i) -- (\maxx,\i);
+		\iftoggle{framedfield}{\numdef{\recy}{#2\baslu+#2\baslu}\draw[draw=framecolor] (0,0) rectangle (\maxx\baslu,\recy);}{}
+\end{tikzpicture}}}
+
+
+%\newcommand{\fillupwithlines}[1][666]{% Linien, Breite in Vielfachen von 5mm  Anzahl der Zeilen.
+	%	\noindent
+	%	\calcboxestoendofpage
+	%	\ifnumcomp{#1}{=}{666}{\calcboxestoendofline\numdef{\maxx}{\maxboxesX}}{\numdef{\maxx}{#1}}
+	%	\iftoggle{showsol}{}{%
+		%		\begin{tikzpicture}[x=\baslu, y=2\baslu]%
+			%			\draw[white] (0,0) -- (0,\linesmax+1);
+			%			\foreach \i in {0,...,\maxboxesY/2} \draw[line width=0.15mm,linecolor] (0,\i) -- (\maxx,\i);
+			%\end{tikzpicture}}}
+
+	
+%\newcommand{\dottedlinedfield}[2][666]{% Linien, Breite in Vielfachen von 5mm  Anzahl der Zeilen.
+%	\noindent
+%	\iftoggle{showsol}{}{%
+%		\ifnumcomp{#2}{>}{0}{\numdef{\linesmax}{#2-1}}{Line number should be bigger than 0!}
+%		\hspace*{\indentinputfield}%
+%		\ifnumequal{#1}{666}{\calcboxnumber\numdef{\maxx}{\boxnumber}}{\numdef{\maxx}{#1}}%
+%		\begin{tikzpicture}[x=\baslu, y=2\baslu]%
+%			\draw[white] (0,0) -- (0,\linesmax+1);
+%			\foreach \i in {0,...,\linesmax} \draw[line width=0.15mm,linecolor,dotted] (0,\i) -- (\maxx,\i);
+%			\iftoggle{framedfield}{\numdef{\recy}{#2\baslu+#2\baslu}\draw[draw=framecolor] (0,0) rectangle (\maxx\baslu,\recy);}{}
+%		\end{tikzpicture}}
+%}
+
+
+\makeatletter
+\newlength\rulefillheight
+\setlength\rulefillheight{2\baslu}
+
+\def\fillwithdots{% Aus Paket exam von P. Hirschhorn
+	\begingroup
+	\ifhmode
+	\par
+	\fi
+	\hrule height \z@
+	\nobreak
+	\color{linecolor}
+	\setbox0=\hbox to \hsize{\hskip \@totalleftmargin
+		\vrule height \rulefillheight depth \z@ width \z@
+		\dotfill}%
+	\cleaders \copy0 \vfill \hbox{}%
+	\endgroup
+}
+
+\def\fillwithrules{%
+	\begingroup
+	\ifhmode
+	\par
+	\fi
+	\hrule height \z@
+	\nobreak
+	\color{linecolor}
+	\setbox0=\hbox to \hsize{\hskip \@totalleftmargin
+		\vrule height \rulefillheight depth \z@ width \z@
+		\hrulefill}%
+	\cleaders \copy0 \vfill \hbox{}%
+	\endgroup
+}
+\makeatother
+
+
+%%% Bedingte Umgebungen mit \NewEnviron{envname}{definition}
+\newcommand{\fillwithlines}{\ifEX{\fillwithrules}}
+\newcommand{\formatsolutiontitle}[1]{\textcolor{solcolor}{#1}} % Formatiert das Lösungslabel
+
+
+\newenvironment{SOLv}{\setcounter{exppts}{0}\iftoggle{showsol}{\begin{solenum}
+			\item \color{solcolor}}{\comment}}
+	{\ifnumgreater{\value{exppts}}{0}{\item[] \printexppts}{}
+		\iftoggle{showsol}{\end{solenum}}{\endcomment}} %\endcomment
+	
+\newenvironment{SOLv*}{\setcounter{exppts}{0}\iftoggle{showsol}{\color{solcolor}}{\comment}}
+	{\ifnumgreater{\value{exppts}}{0}{\item[] \printexppts}{}
+		\iftoggle{showsol}{}{\endcomment}} %\endcomment
+
+
+\newcommand{\solcolorfbox}[2][1pt]{\iftoggle{solmode}{\textcolor{solcolor}{\fboxrule=#1 \fbox{#2}}}{}} % framed box colored solcol
+
+
+\newcommand{\includegraphicsSOL}[3][nogrid]{% Bindet Grafik ein, im SOL-Modus mit TIKZ-Lösungsoverlay
+\ifEXelse {#2}
+{%else (SOL)
+	\begin{tikzpicture}
+		\node[anchor=south west,inner sep=0] (image) at (0,0) {#2};
+		\begin{scope}[x={(image.south east)},y={(image.north west)}]
+			\ifstrequal{#1}{nogrid}{}{\draw[help lines,xstep=.1,ystep=.1] (0,0) grid (1,1);\foreach \x in {0,1,...,9} { \node [anchor=north] at (\x/10,0) {0.\x};}\foreach \y in {0,1,...,9} { \node [anchor=east] at (0,\y/10) {0.\y}; }} #3 \end{scope}
+	\end{tikzpicture}}}	
+
+\newcommand{\includegraphicsEXnSOL}[4][nogrid]{% Bindet Grafik ein, [Grid=#1]{includegraphics=#2}{EX-Overlay=#3}{SOL-Overlay=#4}
+	\begin{tikzpicture}
+		\node[anchor=south west,inner sep=0] (image) at (0,0) {#2};
+		\begin{scope}[x={(image.south east)},y={(image.north west)}]
+			\ifstrequal{#1}{nogrid}{}{\draw[help lines,xstep=.1,ystep=.1] (0,0) grid (1,1);\foreach \x in {0,1,...,9} { \node [anchor=north] at (\x/10,0) {0.\x};}\foreach \y in {0,1,...,9} { \node [anchor=east] at (0,\y/10) {0.\y}; }} \ifEXelse{#3}{#4} \end{scope}
+			\end{tikzpicture}}
+		
+	
+
+
+%\NewEnviron{SUPPLE}{\iftoggle{showsup}{%
+%		\begin{description}[itemindent=0pt]
+%			\item[] \BODY
+%		\end{description}}{}}
+	
+\newenvironment{SUPPLE}{\iftoggle{showsup}{\begin{supplenum}\item}{\comment}} % Aus Legacy-Gründen noch SUPPLE, neu: SUP
+{\iftoggle{showsup}{\end{supplenum}}{\endcomment}} %\endcomment
+
+\newenvironment{SUPPLE*}{\iftoggle{showsup}{}{\comment}} % Ohne Einrückung, aus Legacy-Gründen noch SUPPLE*, neu: SUP*
+{\iftoggle{showsup}{}{\endcomment}} %\endcomment
+
+\newenvironment{SUPv}{\iftoggle{showsup}{\begin{supplenum}\item}{\comment}} % 
+	{\iftoggle{showsup}{\end{supplenum}}{\endcomment}} %\endcomment
+
+\newenvironment{SUPv*}{\iftoggle{showsup}{}{\comment}} % Ohne Einrückung
+{\iftoggle{showsup}{}{\endcomment}} %\endcomment
+
+
+
+\newcommand{\showSOL}{\toggletrue{showsol}\togglefalse{showsup}}
+
+% \newcommand{\notshowSOL}{\togglefalse{showsol}\toggletrue{showsup}}
+\newcommand{\showSUP}{\toggletrue{showsup}}
+\newcommand{\notshowSUP}{\togglefalse{showsup}}
+
+\newcommand{\exrestart}{% Zähler für EXnSOL werden zurück gesetzt
+	\restartlist{exenum} 
+	\restartlist{subexenum}
+	\renewcommand{\thefigure}{\arabic{figure}}
+	\setcounter{figure}{0}{} % Reset für Zähler von Abbildungen
+}
+
+\newcommand{\umu}[1]{\thinspace\ifmmode\ifcsdef{symup}{\symup{#1}}{\mathrm{#1}}\else #1\fi}
+
+\notshowAFB  %schaltet AFB-Anzeige ab
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% Declare Options %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\DeclareOption{AFB}{%
+	\showAFB} % schaltet die AFB-Funktionen an
+\DeclareOption{afb}{%
+	\showAFB} % schaltet die AFB-Funktionen an
+\DeclareOption{1.1}{\setsubtaskprefix{\taskcounter.}\setsubtaskcounterstyle{arabic}\setsubtasksuffix{}}
+\DeclareOption{1a)}{\setsubtaskprefix[3pt]{}\setsubtaskcounterstyle{alph}\setsubtasksuffix{)}}
+\DeclareOption{hidePoints}{\togglefalse{showpoints}} % schaltet die Anzeige derPunkte aus
+\DeclareOption{SOL}{\solmode} % Version zur Kontrolle der Arbeit oder Übungen
+\DeclareOption{PDFform}{\toggletrue{PDFform}} % Als PDF-Formular auszugeben
+\DeclareOption*{\PackageWarning{examplepackage}{Unknown ‘\CurrentOption’}}
+\ProcessOptions\relax
+
