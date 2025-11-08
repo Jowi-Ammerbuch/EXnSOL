@@ -1,6 +1,8 @@
 # **Inoffizielle deutsche Übersetzung der LPPL 1.3c**
 
-*(Nur zu Informationszwecken; rechtlich verbindlich ist ausschließlich das englische Original!)*
+KI-Übersetzung durch ChatGPT am 08.11.2025
+
+*Nur zu Informationszwecken; rechtlich verbindlich ist ausschließlich das englische Original!
 
 ------
 
